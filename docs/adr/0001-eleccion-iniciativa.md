@@ -44,4 +44,6 @@ La iniciativa fue seleccionada debido a su alcance, los desafíos técnicos que 
 - Christine Maulen
 - Diego Silva
 - Carlos Ramos
--Raimundo Bobillier
+- Raimundo Bobillier
+  
+
