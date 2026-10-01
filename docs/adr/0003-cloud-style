@@ -1,0 +1,48 @@
+## Contexto y problema
+
+La plataforma SaaS multi-tenant "AulaViva" tiene que definir su estilo de arquitectura para el despliegue en la nube. 
+El sistema debe soportar la carga académica, evaluaciones automáticas y un tutor con IA integrado al currículum de MINEDUC.
+
+El diseño usa estos 3 (NFRs) críticos:
+
+1. Seguridad y Privacidad: Manejo de datos de estudiantes menores de edad en un entorno multi-tenant. Es obligatorio garantizar aislamiento lógico/físico estricto y prevenir filtraciones de datos.
+2. Escalabilidad por Estacionalidad: Uso caracterizado por picos masivos de tráfico en horario escolar y demanda cercana a cero durante fines de semana, vacaciones, etc.
+3. FinOps y Control de Costos (LLM/RAG): El proceso de de IA genera costos por token consumido. Se requiere evitar costos fijos de infraestructura cuando la herramienta no está en uso activo.
+
+---
+
+## Opciones evaluadas
+
+opcion 1: Monolito modular en contenedor unico (Siempre activo)
+  Pros: Simplicidad de despliegue y desarrollo local.
+  Contras: Desventaja economica. Tiene costos fijos 24/7 y los picos de peticiones de IA pueden agotar recursos del servidor afectando la gestión académica.
+
+opcion 2: Microservicios puros en Kubernetes (Cloud native)
+  Pros: Aislamiento independiente por dominio y escalado granular de cada servicio.
+  Contras: Sobrecarga operativa y de infraestructura innecesaria para la etapa MVP, aumenta la latencia entre servicios y los costos de cluster
+
+Opcion 3: Arquitectura híbrida (Monolito Modular Core + Serverless para IA/RAG) [ELEGIDA]
+  Pros: Combina un Monolito modular desplegado en contenedores escalables para el dominio escolar con funciones Serverless bajo demanda para la orquestacion del Tutor IA.
+
+---
+
+## Decision
+
+Adoptar la Arquitectura híbrida Cloud, donde:
+El Core de Negocio (Cursos, Calificaciones, RBAC, Multi-tenancy) se despliega como un monolito modular en un servicio de contenedores administrado con auto-scaling habilitado, y el Tutor IA y Pipeline RAG se desacoplan en funciones serverless ejecutadas exclusivamente bajo demanda.
+
+---
+
+## Consecuencias y gestion de Riesgos
+
+### Ventajas (Lo que se gana)
+Escalado a Cero (FinOps):La infraestructura del Tutor IA no genera costos durante noches, fines de semana ni vacaciones escolares, optimizando el presupuesto.
+Enfoque escolar: Las peticiones hacia la API del proveedor de LLM no bloquean ni saturan el pool de conexiones del monolito
+Sandbox de Seguridad La capa Serverless es como un middleware que anonimiza y elimina datos personales identificables (PII) antes de comunicarse con proveedores externos de IA.
+
+### Riesgos y su soluciones (Lo que se pierde o debe controlarse)
+Latencia por Inicio en Frío: Las funciones Serverless pueden presentar retrasos al recibir peticiones tras periodos de inactividad.
+ Solucion:Se configura concurrencia provista programada exclusivamente durante la jornada escolar.
+
+Complejidad en Despliegues Duales: El riesgo de cambios puede alterar la capa serverless por desincronizacion
+  Solucion: Se definira la infraestructura como código (IaC) unificada mediante Terraform o Serverless Framework dentro de los pipelines de CI/CD.
