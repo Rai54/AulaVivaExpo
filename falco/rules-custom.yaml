@@ -1,0 +1,43 @@
+# Tres reglas Falco propias para cargas contenerizadas de AulaViva.
+# Funcionan a nivel de nodo/containers del clúster, no solo en un namespace.
+# Ajustar excepciones si herramientas de mantenimiento generan falsos positivos.
+
+- rule: AulaViva Ejecucion De Shell En Contenedor
+  desc: Detecta la ejecucion de shells dentro de contenedores.
+  condition: >
+    (evt.type in (execve, execveat)) and
+    container.id != host and
+    proc.name in (bash, sh, zsh, ash, ksh)
+  output: >
+    AULAVIVA shell en contenedor | usuario=%user.name
+    contenedor=%container.name imagen=%container.image.repository
+    proceso=%proc.name padre=%proc.pname comando=%proc.cmdline
+  priority: WARNING
+  tags: [aulaviva, container, process, mitre_execution]
+
+- rule: AulaViva Escritura En Archivos Sensibles
+  desc: Detecta apertura para escritura de archivos de configuración o credenciales del sistema dentro de contenedores.
+  condition: >
+    (evt.type in (open, openat, openat2)) and
+    evt.is_open_write=true and
+    fd.typechar='f' and fd.num>=0 and
+    container.id != host and
+    fd.name pmatch (/etc, /root/.ssh)
+  output: >
+    AULAVIVA escritura en ruta sensible | usuario=%user.name
+    contenedor=%container.name archivo=%fd.name
+    proceso=%proc.name comando=%proc.cmdline
+  priority: ERROR
+  tags: [aulaviva, container, filesystem, mitre_persistence]
+
+- rule: AulaViva Gestor De Paquetes En Contenedor
+  desc: Detecta instalación potencialmente no autorizada de software en un contenedor en ejecución.
+  condition: >
+    (evt.type in (execve, execveat)) and
+    container.id != host and
+    proc.name in (apk, apt, apt-get, dpkg, yum, dnf, rpm)
+  output: >
+    AULAVIVA gestor de paquetes ejecutado | usuario=%user.name
+    contenedor=%container.name proceso=%proc.name comando=%proc.cmdline
+  priority: WARNING
+  tags: [aulaviva, container, process, mitre_execution]

@@ -1,0 +1,62 @@
+# Kyverno >= 1.20 - ImageValidatingPolicy (API CEL, reemplaza ClusterPolicy/verifyImages).
+# IMPORTANTE: adecuar el glob de la imagen y la identidad del workflow a la
+# imagen REAL firmada mediante Cosign. Sin firma valida, el pod será rechazado.
+# La política aplica a namespaces que tengan el label indicado abajo.
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: aulaviva-require-image-signature
+  annotations:
+    policies.kyverno.io/title: AulaViva - exigir firma Cosign
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions:
+  - Audit
+  failurePolicy: Fail
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    admission:
+      enabled: true
+    background:
+      enabled: false
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        security.aulaviva.io/verify-signatures: "true"
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  # AJUSTAR si su imagen está publicada bajo otro nombre/registro.
+  matchImageReferences:
+    - glob: "ghcr.io/rai54/aulaviva*"
+  validationConfigurations:
+    mutateDigest: true
+    verifyDigest: false
+    required: true
+  attestors:
+    - name: trustedGithubWorkflow
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              # Este workflow es una IDENTIDAD PROPUESTA, no comprobada en el repo.
+              # Cambiar por el que efectivamente firme las imágenes con Cosign.
+              subject: https://github.com/Rai54/AulaVivaExpo/.github/workflows/build-and-sign.yaml@refs/heads/main
+        ctlog:
+          url: https://rekor.sigstore.dev
+  variables:
+    - name: allImages
+      expression: >-
+        images.?containers.orValue([]) +
+        images.?initContainers.orValue([]) +
+        images.?ephemeralContainers.orValue([])
+  validations:
+    - expression: >-
+        variables.allImages.map(image,
+          verifyImageSignatures(image, [attestors.trustedGithubWorkflow])
+        ).all(count, count > 0)
+      message: "AulaViva: imagen sin firma Cosign válida de nuestro workflow de CI"
