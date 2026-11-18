@@ -12,7 +12,7 @@ metadata:
     policies.kyverno.io/severity: high
 spec:
   validationActions:
-  - Audit
+  - Deny
   failurePolicy: Fail
   webhookConfiguration:
     timeoutSeconds: 30
@@ -32,7 +32,7 @@ spec:
         resources: ["pods"]
   # AJUSTAR si su imagen está publicada bajo otro nombre/registro.
   matchImageReferences:
-    - glob: "ghcr.io/rai54/aulaviva*"
+  - glob: "ghcr.io/rai54/aulaviva*"
   validationConfigurations:
     mutateDigest: true
     verifyDigest: false
