@@ -1,0 +1,7 @@
+# Configuración de Falco para las pruebas de AulaViva
+tty: true
+
+falco:
+  rule_matching: all
+
+customRules: {}
